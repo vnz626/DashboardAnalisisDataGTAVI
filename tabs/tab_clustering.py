@@ -1,58 +1,88 @@
+import pandas as pd
+import plotly.express as px
 import streamlit as st
 
+import analysis as an
+
+try:
+    from wordcloud import WordCloud
+except ImportError:  # aplikasi tetap jalan walau pustaka belum terpasang
+    WordCloud = None
+
+# ---------------------------------------------------------------------------
+# DIISI YOHANES setelah membaca kata dominan & contoh postingan tiap cluster.
+# Nomor cluster (0, 1, 2) harus sesuai dengan yang tampil di aplikasi.
+# ---------------------------------------------------------------------------
+THEME_NAMES = {
+    0: "TODO: nama tema cluster 0",
+    1: "TODO: nama tema cluster 1",
+    2: "TODO: nama tema cluster 2",
+}
+
+INTERPRETATION = (
+    "TODO: jelaskan apa yang membedakan ketiga cluster dan bagian yang masih tumpang tindih."
+)
+
+
 @st.cache_data
-def run_kmeans_clustering(text_series):
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.cluster import KMeans
-    
-    vectorizer = TfidfVectorizer(max_features=100, stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(text_series.astype(str))
-    
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-    cluster_labels = kmeans.fit_predict(tfidf_matrix)
-    
-    terms = vectorizer.get_feature_names_out()
-    order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
-    
-    return cluster_labels, terms, order_centroids
+def _cluster(df: pd.DataFrame):
+    # Memakai fungsi yang sama dengan notebook Colab, jadi hasilnya sama dengan laporan.
+    return an.run_clustering(df)
+
+
+def _show_text(text: str):
+    if text.strip().startswith("TODO"):
+        st.warning(f"Belum diisi kelompok: {text}")
+    else:
+        st.markdown(text)
+
 
 def render_tab_clustering(df):
     st.header("Clustering Data Teks (TF-IDF + K-Means)")
-    
-    # Ambil hasil terms dan centroids yang sudah dihitung di app.py
-    terms = getattr(st.session_state, 'cluster_terms', None)
-    order_centroids = getattr(st.session_state, 'cluster_centroids', None)
-    
-    if terms is None or order_centroids is None or 'cluster' not in df.columns:
-        df['cluster'], terms, order_centroids = run_kmeans_clustering(df['cleaned_text'])
-    
-    theme_names = {
-        0: "Ekspektasi Trailer & Tanggal Rilis",
-        1: "Diskusi Spesifikasi & Grafik Game",
-        2: "Reaksi Komunitas & Memes"
-    }
-    
-    cols = st.columns(3)
-    for cluster_id in range(3):
-        with cols[cluster_id]:
-            cluster_data = df[df['cluster'] == cluster_id]
-            top_words = [terms[ind] for ind in order_centroids[cluster_id, :5]]
-            
-            st.subheader(f"Cluster {cluster_id}")
-            st.markdown(f"**Nama Tema:** {theme_names.get(cluster_id, 'Tema ' + str(cluster_id))}")
-            st.metric("Jumlah Postingan", len(cluster_data))
-            
-            st.markdown("**5 Kata Dominan:**")
-            st.write(", ".join(top_words))
-            
-            st.markdown("**3 Contoh Postingan:**")
-            samples = cluster_data['text'].head(3).tolist()
-            for i, sample in enumerate(samples, 1):
-                st.caption(f"{i}. \"{sample}\"")
-                
+
+    data = df.copy()
+    if "clean_text" not in data.columns:
+        data["clean_text"] = data["text"].apply(an.clean_text)
+    data["clean_text"] = data["clean_text"].fillna("").astype(str)
+
+    try:
+        clustered, summary, excluded = _cluster(data)
+    except Exception as exc:
+        st.error(f"Clustering gagal dijalankan: {exc}")
+        return
+
+    if excluded:
+        st.caption(f"{excluded} postingan dikeluarkan karena teks bersihnya kosong.")
+
+    sizes = pd.DataFrame({
+        "Cluster": [f"{s['cluster']}: {THEME_NAMES.get(s['cluster'], '')}" for s in summary],
+        "Jumlah": [s["jumlah"] for s in summary],
+    })
+    st.plotly_chart(
+        px.bar(sizes, x="Cluster", y="Jumlah", text="Jumlah", title="Ukuran cluster"),
+        width="stretch",
+    )
+
+    for s in summary:
+        c = s["cluster"]
+        with st.container(border=True):
+            st.subheader(f"Cluster {c}: {THEME_NAMES.get(c, '')}")
+            st.metric("Jumlah Postingan", s["jumlah"])
+            st.markdown("**5 Kata Dominan:** " + ", ".join(f"`{w}`" for w in s["kata_dominan"]))
+
+            freq = an.cluster_word_frequencies(clustered, c)
+            if WordCloud is not None and freq:
+                wc = WordCloud(width=900, height=320, background_color="white",
+                               colormap="viridis", random_state=an.RANDOM_STATE)
+                st.image(wc.generate_from_frequencies(freq).to_image(), width="stretch",
+                         caption="Word cloud: makin besar kata, makin sering muncul di cluster ini")
+            elif WordCloud is None:
+                st.caption("Pasang pustaka `wordcloud` untuk menampilkan word cloud.")
+
+            st.markdown("**3 Contoh Postingan (paling mewakili cluster):**")
+            for i, sample in enumerate(s["contoh"], 1):
+                st.caption(f'{i}. "{sample}"')
+
     st.markdown("---")
     st.subheader("Interpretasi & Analisis Clustering")
-    st.markdown("""
-    * **Pembeda Isi Cluster:** Cluster 0 berfokus pada spekulasi rilis dan trailer, Cluster 1 lebih didominasi percakapan teknis perangkat dan visual, sedangkan Cluster 2 berisi humor dan reaksi umum netizen.
-    * **Tumpang Tindih Pembahasan:** Masih ditemukan sedikit tumpang tindih kata kunci umum seperti *'GTA'*, *'Rockstar'*, dan *'Game'* di seluruh cluster karena pembahasan berasal dari satu topik yang sama.
-    """)
+    _show_text(INTERPRETATION)

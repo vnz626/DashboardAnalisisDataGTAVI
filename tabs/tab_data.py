@@ -1,7 +1,8 @@
 import streamlit as st
 
-def render_tab_data(df, df_valid_likes, required_columns):
+def render_tab_data(df, df_valid_likes, required_columns, filename):
     st.header("Pratinjau & Pemeriksaan Dataset")
+    st.caption(f"Menggunakan file: `data/{filename}`")
     
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Postingan", len(df))

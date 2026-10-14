@@ -1,14 +1,14 @@
-import streamlit as st
-import pandas as pd
+import os
 import re
+import pandas as pd
+import streamlit as st
 
-# Import modul dari folder tabs
+# Import fungsi render dari folder tabs
 from tabs.tab_data import render_tab_data
 from tabs.tab_sentimen import render_tab_sentimen
 from tabs.tab_clustering import render_tab_clustering
 from tabs.tab_regresi import render_tab_regresi
 
-# Konfigurasi Halaman Streamlit
 st.set_page_config(page_title="Dashboard Analisis X - GTA VI", layout="wide")
 
 st.title("🎮 Dashboard Analisis Percakapan GTA VI di X (Twitter)")
@@ -22,54 +22,57 @@ def count_words(text):
 def count_hashtags(text):
     return len(re.findall(r'#\w+', str(text)))
 
-def validate_dataframe(df):
-    return [col for col in REQUIRED_COLUMNS if col not in df.columns]
-
 # -----------------------------------------------------------------------------
-# SIDEBAR - UNGGAH DATASET
+# MEMUAT DATASET (data/gta6_clean.csv & data/evaluasi_sentimen.csv)
 # -----------------------------------------------------------------------------
-st.sidebar.header("📁 Unggah Dataset")
-uploaded_file = st.sidebar.file_uploader("Pilih file CSV utama", type=["csv"])
-uploaded_eval_file = st.sidebar.file_uploader("Pilih file evaluasi_sentimen.csv (opsional)", type=["csv"])
+MAIN_CSV_PATH = os.path.join("data", "gta6_clean.csv")
+EVAL_CSV_PATH = os.path.join("data", "evaluasi_sentimen.csv")
 
-if uploaded_file is not None:
-    try:
-        df = pd.read_csv(uploaded_file)
-        missing_cols = validate_dataframe(df)
-        
-        if missing_cols:
-            st.error(f"❌ Kolom wajib berikut tidak ditemukan dalam dataset: {', '.join(missing_cols)}")
-            st.stop()
-        
-        # Preprocessing Sederhana
-        if 'cleaned_text' not in df.columns:
-            df['cleaned_text'] = df['text'].fillna('')
-        else:
-            df['cleaned_text'] = df['cleaned_text'].fillna('')
-            
-        df['word_count'] = df['text'].apply(count_words)
-        df['hashtag_count'] = df['text'].apply(count_hashtags)
-        df['like_count'] = pd.to_numeric(df['like_count'], errors='coerce')
-        
-        # Jalankan KMeans clustering di awal untuk mencegah modifikasi/side-effect di dalam tab
-        from tabs.tab_clustering import run_kmeans_clustering
-        df['cluster'], st.session_state.cluster_terms, st.session_state.cluster_centroids = run_kmeans_clustering(df['cleaned_text'])
-
-        df_valid_likes = df.dropna(subset=['like_count']).copy()
-        
-        eval_df = None
-        if uploaded_eval_file is not None:
-            eval_df = pd.read_csv(uploaded_eval_file)
-
-    except Exception as e:
-        st.error(f"Gagal membaca file CSV: {e}")
+@st.cache_data
+def load_main_data():
+    if not os.path.exists(MAIN_CSV_PATH):
+        st.error(f"❌ File `{MAIN_CSV_PATH}` tidak ditemukan! Pastikan file disimpan di dalam folder `data/`.")
         st.stop()
-else:
-    st.info("👋 Silakan unggah file CSV dataset GTA VI pada menu sidebar untuk memulai analisis.")
+    return pd.read_csv(MAIN_CSV_PATH)
+
+@st.cache_data
+def load_eval_data():
+    if os.path.exists(EVAL_CSV_PATH):
+        return pd.read_csv(EVAL_CSV_PATH)
+    return None
+
+# Load Datasets
+df_raw = load_main_data()
+eval_df = load_eval_data()
+
+# Validasi Kolom Wajib
+missing_cols = [col for col in REQUIRED_COLUMNS if col not in df_raw.columns]
+if missing_cols:
+    st.error(f"❌ File `{MAIN_CSV_PATH}` tidak memiliki kolom wajib: {', '.join(missing_cols)}")
     st.stop()
 
+# Preprocessing Dataset Utama
+df = df_raw.copy()
+if 'cleaned_text' not in df.columns:
+    df['cleaned_text'] = df['text']
+
+df['word_count'] = df['text'].apply(count_words)
+df['hashtag_count'] = df['text'].apply(count_hashtags)
+df['like_count'] = pd.to_numeric(df['like_count'], errors='coerce')
+df_valid_likes = df.dropna(subset=['like_count']).copy()
+
+# Sidebar Info
+st.sidebar.header("ℹ️ Status Dataset")
+st.sidebar.success(f"📁 Dataset Utama:\n`{MAIN_CSV_PATH}`")
+st.sidebar.metric("Total Postingan", len(df))
+
+if eval_df is not None:
+    st.sidebar.success(f"✅ `{EVAL_CSV_PATH}` terdeteksi.")
+else:
+    st.sidebar.warning(f"⚠️ `{EVAL_CSV_PATH}` belum ditemukan.")
+
 # -----------------------------------------------------------------------------
-# INISIALISASI TAB
+# TAB NAVIGATION
 # -----------------------------------------------------------------------------
 tab_data, tab_sentiment, tab_clustering, tab_regression = st.tabs([
     "📊 Data", 
@@ -78,8 +81,10 @@ tab_data, tab_sentiment, tab_clustering, tab_regression = st.tabs([
     "📈 Regresi Linear"
 ])
 
+filename = os.path.basename(MAIN_CSV_PATH)
+
 with tab_data:
-    render_tab_data(df, df_valid_likes, REQUIRED_COLUMNS)
+    render_tab_data(df, df_valid_likes, REQUIRED_COLUMNS, filename)
 
 with tab_sentiment:
     render_tab_sentimen(df, eval_df)
@@ -91,7 +96,7 @@ with tab_regression:
     render_tab_regresi(df_valid_likes)
 
 # -----------------------------------------------------------------------------
-# BAGIAN AKHIR: TEMUAN & KETERBATASAN
+# TEMUAN UTAMA & KETERBATASAN
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.header("📌 Temuan Utama & Keterbatasan")

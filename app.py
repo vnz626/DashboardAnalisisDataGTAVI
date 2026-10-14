@@ -43,12 +43,18 @@ if uploaded_file is not None:
         
         # Preprocessing Sederhana
         if 'cleaned_text' not in df.columns:
-            df['cleaned_text'] = df['text']
+            df['cleaned_text'] = df['text'].fillna('')
+        else:
+            df['cleaned_text'] = df['cleaned_text'].fillna('')
             
         df['word_count'] = df['text'].apply(count_words)
         df['hashtag_count'] = df['text'].apply(count_hashtags)
         df['like_count'] = pd.to_numeric(df['like_count'], errors='coerce')
         
+        # Jalankan KMeans clustering di awal untuk mencegah modifikasi/side-effect di dalam tab
+        from tabs.tab_clustering import run_kmeans_clustering
+        df['cluster'], st.session_state.cluster_terms, st.session_state.cluster_centroids = run_kmeans_clustering(df['cleaned_text'])
+
         df_valid_likes = df.dropna(subset=['like_count']).copy()
         
         eval_df = None

@@ -19,7 +19,12 @@ def run_kmeans_clustering(text_series):
 def render_tab_clustering(df):
     st.header("Clustering Data Teks (TF-IDF + K-Means)")
     
-    df['cluster'], terms, order_centroids = run_kmeans_clustering(df['cleaned_text'])
+    # Ambil hasil terms dan centroids yang sudah dihitung di app.py
+    terms = getattr(st.session_state, 'cluster_terms', None)
+    order_centroids = getattr(st.session_state, 'cluster_centroids', None)
+    
+    if terms is None or order_centroids is None or 'cluster' not in df.columns:
+        df['cluster'], terms, order_centroids = run_kmeans_clustering(df['cleaned_text'])
     
     theme_names = {
         0: "Ekspektasi Trailer & Tanggal Rilis",

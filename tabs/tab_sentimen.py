@@ -49,9 +49,12 @@ def render_tab_sentimen(df, eval_df):
     st.subheader("Pemeriksaan Manual (20 Sampel Evaluasi)")
     
     if eval_df is not None:
-        st.dataframe(eval_df.head(20), use_container_width=True)
-        
-        if 'label_manual' in eval_df.columns and 'label_sistem' in eval_df.columns:
+        if 'label_manual' not in eval_df.columns or 'label_sistem' not in eval_df.columns:
+            st.warning("⚠️ File `evaluasi_sentimen.csv` tidak memiliki kolom 'label_manual' atau 'label_sistem'. Menampilkan pratinjau file saja.")
+            st.dataframe(eval_df.head(20), use_container_width=True)
+        else:
+            st.dataframe(eval_df.head(20), use_container_width=True)
+            
             matches = (eval_df['label_manual'] == eval_df['label_sistem']).sum()
             total_eval = len(eval_df)
             acc = (matches / total_eval) * 100

@@ -14,13 +14,19 @@ except ImportError:  # aplikasi tetap jalan walau pustaka belum terpasang
 # Nomor cluster (0, 1, 2) harus sesuai dengan yang tampil di aplikasi.
 # ---------------------------------------------------------------------------
 THEME_NAMES = {
-    0: "TODO: nama tema cluster 0",
-    1: "TODO: nama tema cluster 1",
-    2: "TODO: nama tema cluster 2",
+    0: "Antusiasme dan Dukungan",
+    1: "Musik",
+    2: "Meme dan Satir",
 }
 
 INTERPRETATION = (
-    "TODO: jelaskan apa yang membedakan ketiga cluster dan bagian yang masih tumpang tindih."
+    "Cluster 0 (Antusiasme) berisi obrolan umum: harapan, countdown, dan komentar santai.\n\n "
+    "Cluster 1 (Musik) sangat spesifik: promosi lagu Cardi B dari 'album GTA 6'. \n\n"
+    "Cluster 2 (Meme dan Satire) berpola 'We got X before GTA 6'. \n\n"
+    "Cluster 0 menampung 315 dari 383 postingan dengan kata dominan generik, "
+    "jadi berfungsi sebagai cluster sisa. \n\n"
+    "Tumpang tindih masih ada. Meme bernada antusias bisa masuk Cluster 0. \n\n"
+    "Cluster 1 dan 2 batasnya lebih jelas karena memakai kata atau pola khas."
 )
 
 

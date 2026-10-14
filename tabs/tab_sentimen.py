@@ -49,21 +49,22 @@ def render_tab_sentimen(df, eval_df):
     st.subheader("Pemeriksaan Manual (20 Sampel Evaluasi)")
     
     if eval_df is not None:
-        if 'label_manual' not in eval_df.columns or 'label_sistem' not in eval_df.columns:
-            st.warning("⚠️ File `evaluasi_sentimen.csv` tidak memiliki kolom 'label_manual' atau 'label_sistem'. Menampilkan pratinjau file saja.")
+        if 'label_manual' not in eval_df.columns or ('label_sistem' not in eval_df.columns and 'prediksi_sistem' not in eval_df.columns):
+            st.warning("⚠️ File `evaluasi_sentimen.csv` tidak memiliki kolom label evaluasi yang sesuai.")
             st.dataframe(eval_df.head(20), use_container_width=True)
         else:
+            sys_col = 'label_sistem' if 'label_sistem' in eval_df.columns else 'prediksi_sistem'
             st.dataframe(eval_df.head(20), use_container_width=True)
             
-            matches = (eval_df['label_manual'] == eval_df['label_sistem']).sum()
+            matches = (eval_df['label_manual'] == eval_df[sys_col]).sum()
             total_eval = len(eval_df)
             acc = (matches / total_eval) * 100
             
             st.info(f"**Akurasi Evaluasi Manual:** {matches} dari {total_eval} postingan sesuai ({acc:.2f}%)")
             
-            mismatches = eval_df[eval_df['label_manual'] != eval_df['label_sistem']]
+            mismatches = eval_df[eval_df['label_manual'] != eval_df[sys_col]]
             if len(mismatches) > 0:
                 st.subheader("Diskusi Ketidaksesuaian Evaluasi")
-                st.dataframe(mismatches.head(3)[['text', 'label_manual', 'label_sistem']])
+                st.dataframe(mismatches.head(3)[['text', 'label_manual', sys_col]])
     else:
         st.write("📌 *Unggah file `evaluasi_sentimen.csv` di sidebar untuk menampilkan ringkasan evaluasi manual 20 postingan.*")
